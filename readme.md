@@ -37,37 +37,19 @@ cp -r live-spec ~/.claude/skills/
 
 ### Cursor / Windsurf
 
-将 `live-spec/SKILL.md` 的内容粘贴到项目规则文件中：
-
-- Cursor：`.cursorrules` 或 Cursor Settings → Rules
-- Windsurf：`.windsurfrules`
-
-用自然语言触发，例如："帮我生成这个页面的需求文档"、"同步需求说明"。
-
-> **注意**：`/live-spec tag` 版本快照功能不支持，其余功能正常可用。
+将 `live-spec/SKILL.md` 内容粘贴到 `.cursorrules`（Cursor）或 `.windsurfrules`（Windsurf），用自然语言触发，如"帮我生成这个页面的需求文档"。不支持 `/live-spec tag`。
 
 ---
 
 ### Gemini CLI
 
-将 `live-spec/SKILL.md` 的内容粘贴到项目根目录的 `GEMINI.md` 文件中，Gemini CLI 会自动读取并按 live-spec 工作流执行。
-
-用自然语言触发，例如："帮我生成这个页面的需求文档"。
-
-> **注意**：`/live-spec tag` 版本快照功能不支持，其余功能正常可用。
+将 `live-spec/SKILL.md` 内容粘贴到项目根目录的 `GEMINI.md`，用自然语言触发。不支持 `/live-spec tag`。
 
 ---
 
 ### Claude Web（Projects）/ Gemini Web（Gems）
 
-将 `live-spec/SKILL.md` 的内容粘贴到：
-
-- Claude Web：Project → Custom Instructions
-- Gemini Web：创建 Gem → 系统指令
-
-使用时将页面代码粘贴进对话，AI 按 live-spec 工作流生成需求文档和组件代码，手动复制到项目中。
-
-> **注意**：无文件系统访问，所有输出需手动复制。`/live-spec tag` 版本快照功能不支持。
+将 `live-spec/SKILL.md` 内容粘贴到 Project 自定义指令（Claude）或 Gem 系统指令（Gemini），把页面代码粘贴进对话后触发，手动复制输出到项目。不支持 `/live-spec tag`。
 
 ---
 
