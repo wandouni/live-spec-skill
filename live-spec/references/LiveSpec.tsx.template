@@ -1,0 +1,330 @@
+'use client'
+
+import { useState, useEffect, useCallback, useMemo } from 'react'
+
+export interface SpecVersion {
+  version: string
+  label: string
+  note: string
+  createdAt: string
+  spec: string
+}
+
+interface LiveSpecProps {
+  content: string
+  pageName?: string
+  allSpecs?: string
+  history?: SpecVersion[]
+}
+
+type CopyState = 'idle' | 'copied'
+
+// 逐行 diff，返回带标记的行数组
+function computeDiff(
+  prevSpec: string,
+  currSpec: string
+): { text: string; type: 'added' | 'removed' | 'modified' | 'unchanged' }[] {
+  const prevLines = prevSpec.split('\n')
+  const currLines = currSpec.split('\n')
+
+  // 提取编号 key（如 "1.1"、"2"）
+  const getKey = (line: string) => {
+    const m = line.match(/^(\s*)([\d]+(?:\.[\d]+)*)\s/)
+    return m ? m[2] : null
+  }
+
+  const prevMap = new Map<string, string>()
+  prevLines.forEach(l => {
+    const k = getKey(l)
+    if (k) prevMap.set(k, l.trim())
+  })
+
+  const currMap = new Map<string, string>()
+  currLines.forEach(l => {
+    const k = getKey(l)
+    if (k) currMap.set(k, l.trim())
+  })
+
+  const result: { text: string; type: 'added' | 'removed' | 'modified' | 'unchanged' }[] = []
+
+  // 删除的行（在 prev 有，curr 没有）
+  prevLines.forEach(line => {
+    const k = getKey(line)
+    if (k && !currMap.has(k)) {
+      result.push({ text: '- ' + line, type: 'removed' })
+    }
+  })
+
+  // 当前所有行，判断新增/修改/不变
+  currLines.forEach(line => {
+    const k = getKey(line)
+    if (!k) {
+      result.push({ text: line, type: 'unchanged' })
+      return
+    }
+    if (!prevMap.has(k)) {
+      result.push({ text: '+ ' + line, type: 'added' })
+    } else if (prevMap.get(k) !== line.trim()) {
+      result.push({ text: '~ ' + line, type: 'modified' })
+    } else {
+      result.push({ text: line, type: 'unchanged' })
+    }
+  })
+
+  return result
+}
+
+export default function LiveSpec({
+  content,
+  pageName = '当前页面',
+  allSpecs,
+  history = [],
+}: LiveSpecProps) {
+  const [open, setOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const [copyCurrentState, setCopyCurrentState] = useState<CopyState>('idle')
+  const [copyAllState, setCopyAllState] = useState<CopyState>('idle')
+
+  // 版本列表：history + 当前（最新）
+  const versions = useMemo(() => {
+    const curr: SpecVersion = {
+      version: 'current',
+      label: '当前版本',
+      note: '',
+      createdAt: new Date().toISOString(),
+      spec: content,
+    }
+    return [...history, curr]
+  }, [history, content])
+
+  const [selectedIdx, setSelectedIdx] = useState(versions.length - 1)
+
+  // 当前选中版本
+  const selectedVersion = versions[selectedIdx]
+
+  // 计算 diff：对比选中版本与上一版本
+  const diffLines = useMemo(() => {
+    if (selectedIdx === 0) return null // 首版无 diff
+    const prev = versions[selectedIdx - 1].spec
+    const curr = selectedVersion.spec
+    return computeDiff(prev, curr)
+  }, [selectedIdx, versions, selectedVersion])
+
+  useEffect(() => { setMounted(true) }, [])
+
+  // 选版本时重置到最新
+  useEffect(() => {
+    setSelectedIdx(versions.length - 1)
+  }, [versions.length])
+
+  const handleCopy = useCallback(async (type: 'current' | 'all') => {
+    const text = type === 'current' ? content : (allSpecs ?? content)
+    try {
+      await navigator.clipboard.writeText(text)
+      if (type === 'current') {
+        setCopyCurrentState('copied')
+        setTimeout(() => setCopyCurrentState('idle'), 1800)
+      } else {
+        setCopyAllState('copied')
+        setTimeout(() => setCopyAllState('idle'), 1800)
+      }
+    } catch {}
+  }, [content, allSpecs])
+
+  if (!mounted || process.env.NODE_ENV !== 'development') return null
+
+  const lineColor = {
+    added:     { bg: 'rgba(34,197,94,0.10)',  text: '#15803d' },
+    removed:   { bg: 'rgba(239,68,68,0.10)',   text: '#b91c1c' },
+    modified:  { bg: 'rgba(234,179,8,0.12)',   text: '#92400e' },
+    unchanged: { bg: 'transparent',            text: '#374151' },
+  }
+
+  return (
+    <>
+      {/* 悬浮球 */}
+      <button
+        onClick={() => setOpen(true)}
+        style={{
+          position: 'fixed', bottom: '24px', right: '24px', zIndex: 9998,
+          width: '40px', height: '40px', borderRadius: '50%',
+          background: '#D60078', color: '#fff', border: 'none', cursor: 'pointer',
+          boxShadow: '0 2px 8px rgba(214,0,120,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '15px', fontWeight: 700,
+          fontFamily: '"SF Pro Display", "Helvetica Neue", Arial, sans-serif',
+          letterSpacing: '-0.5px', transition: 'opacity 0.15s, box-shadow 0.15s',
+          userSelect: 'none',
+        }}
+        onMouseEnter={e => {
+          ;(e.currentTarget as HTMLButtonElement).style.opacity = '0.88'
+          ;(e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 14px rgba(214,0,120,0.45)'
+        }}
+        onMouseLeave={e => {
+          ;(e.currentTarget as HTMLButtonElement).style.opacity = '1'
+          ;(e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(214,0,120,0.35)'
+        }}
+        title="查看需求文档 · live-spec"
+        aria-label="查看需求文档"
+      >
+        Z
+      </button>
+
+      {/* 遮罩 */}
+      {open && (
+        <div
+          onClick={() => setOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 9998,
+            background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(1px)',
+          }}
+        />
+      )}
+
+      {/* 抽屉 */}
+      <div style={{
+        position: 'fixed', top: 0, right: 0, zIndex: 9999,
+        height: '100%', width: '500px', background: '#fff',
+        boxShadow: '-4px 0 32px rgba(0,0,0,0.12)',
+        display: 'flex', flexDirection: 'column',
+        transform: open ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 0.28s cubic-bezier(0.4,0,0.2,1)',
+      }}>
+
+        {/* 头部 */}
+        <div style={{
+          padding: '14px 18px 12px', borderBottom: '1px solid #f0f0f0',
+          flexShrink: 0, background: '#fafafa',
+        }}>
+          {/* 第一行：标题 + 复制 + 关闭 */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div>
+              <div style={{ fontSize: '10px', color: '#aaa', letterSpacing: '0.05em', marginBottom: '2px' }}>LIVE SPEC</div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#1a1a1a' }}>{pageName}</div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <CopyButton label="复制当前" state={copyCurrentState} onClick={() => handleCopy('current')} />
+              <CopyButton label="复制全部" state={copyAllState} onClick={() => handleCopy('all')} />
+              <button
+                onClick={() => setOpen(false)}
+                style={{
+                  width: '28px', height: '28px', borderRadius: '6px',
+                  border: 'none', background: 'transparent', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#999', fontSize: '18px', lineHeight: 1, marginLeft: '2px',
+                }}
+                onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.background = '#f0f0f0')}
+                onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.background = 'transparent')}
+              >×</button>
+            </div>
+          </div>
+
+          {/* 第二行：版本下拉 + diff 图例 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <select
+              value={selectedIdx}
+              onChange={e => setSelectedIdx(Number(e.target.value))}
+              style={{
+                height: '28px', padding: '0 8px', borderRadius: '6px',
+                border: '1px solid #e5e7eb', background: '#fff',
+                fontSize: '12px', color: '#374151', cursor: 'pointer',
+                flex: 1, maxWidth: '220px',
+              }}
+            >
+              {versions.map((v, i) => (
+                <option key={i} value={i}>
+                  {v.label}{v.note ? ` · ${v.note}` : ''}
+                </option>
+              ))}
+            </select>
+
+            {/* diff 图例（首版不显示） */}
+            {selectedIdx > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px' }}>
+                <LegendDot color="#15803d" label="新增" />
+                <LegendDot color="#b91c1c" label="删除" />
+                <LegendDot color="#92400e" label="修改" />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 内容区 */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 0' }}>
+          {diffLines ? (
+            // 有 diff：逐行渲染
+            <div style={{ fontFamily: '"JetBrains Mono","Fira Code","SF Mono",Menlo,monospace', fontSize: '12px', lineHeight: '1.8' }}>
+              {diffLines.map((line, i) => {
+                const c = lineColor[line.type]
+                return (
+                  <div key={i} style={{
+                    background: c.bg, color: c.text,
+                    padding: '0 18px', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                  }}>
+                    {line.text}
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            // 首版：纯文本
+            <pre style={{
+              fontFamily: '"JetBrains Mono","Fira Code","SF Mono",Menlo,monospace',
+              fontSize: '12px', lineHeight: '1.8', color: '#374151',
+              whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+              margin: 0, padding: '0 18px',
+            }}>
+              {selectedVersion.spec}
+            </pre>
+          )}
+        </div>
+
+        {/* 底部 */}
+        <div style={{
+          padding: '8px 18px', borderTop: '1px solid #f0f0f0',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          flexShrink: 0, background: '#fafafa',
+        }}>
+          <span style={{ fontSize: '11px', color: '#ccc' }}>仅开发环境可见 · live-spec skill</span>
+          <span style={{ fontSize: '11px', color: '#ccc' }}>
+            {versions.length > 1 ? `${versions.length - 1} 个历史版本` : '首版'}
+          </span>
+        </div>
+      </div>
+    </>
+  )
+}
+
+function CopyButton({ label, state, onClick }: { label: string; state: CopyState; onClick: () => void }) {
+  const copied = state === 'copied'
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        height: '28px', padding: '0 10px', borderRadius: '6px',
+        border: `1px solid ${copied ? '#22c55e' : '#e5e7eb'}`,
+        background: copied ? '#f0fdf4' : '#fff',
+        color: copied ? '#16a34a' : '#555',
+        fontSize: '12px', cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: '4px',
+        transition: 'all 0.15s', whiteSpace: 'nowrap',
+      }}
+      onMouseEnter={e => { if (!copied) (e.currentTarget as HTMLButtonElement).style.borderColor = '#D60078' }}
+      onMouseLeave={e => { if (!copied) (e.currentTarget as HTMLButtonElement).style.borderColor = '#e5e7eb' }}
+    >
+      <span>{copied ? '✓' : '⎘'}</span>
+      <span>{copied ? '已复制' : label}</span>
+    </button>
+  )
+}
+
+function LegendDot({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{ display: 'flex', alignItems: 'center', gap: '3px', color: '#999' }}>
+      <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: color, display: 'inline-block' }} />
+      {label}
+    </span>
+  )
+}
+
+// live-spec skill v2
