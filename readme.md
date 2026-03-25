@@ -10,6 +10,16 @@
 
 ---
 
+## 效果预览
+
+页面右下角自动挂载悬浮球，点击展开当前页面的结构化需求文档：
+
+![悬浮球挂载在页面右下角](images/1.png)
+
+![点击展开需求文档抽屉](images/2.png)
+
+---
+
 ## 安装与使用
 
 ### Claude Code（推荐，功能完整）
@@ -50,16 +60,6 @@ cp -r live-spec ~/.claude/skills/
 ### Claude Web（Projects）/ Gemini Web（Gems）
 
 将 `live-spec/SKILL.md` 内容粘贴到 Project 自定义指令（Claude）或 Gem 系统指令（Gemini），把页面代码粘贴进对话后触发，手动复制输出到项目。不支持 `/live-spec tag`。
-
----
-
-## 效果预览
-
-页面右下角自动挂载悬浮球，点击展开当前页面的结构化需求文档：
-
-![悬浮球挂载在页面右下角](images/1.png)
-
-![点击展开需求文档抽屉](images/2.png)
 
 ---
 
