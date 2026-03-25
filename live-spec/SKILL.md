@@ -43,9 +43,9 @@ description: >
 
 **若不存在**，创建该文件，内容完整照搬 `references/LiveSpec.tsx.template`，不做任何修改直接写入。
 
-**若已存在**，检查文件末尾是否包含注释 `// live-spec skill`——
+**若已存在**，检查文件末尾是否包含注释 `// live-spec skill v2`——
 - 包含：说明是新版，跳过
-- 不包含：说明是旧版，**覆盖写入新版**，并告知用户已自动升级
+- 不包含：说明是旧版（缺少 `history` prop 和版本切换 UI），**覆盖写入新版**，并告知用户已自动升级
 
 `/live-spec init`：仅执行此步，安装 LiveSpec 组件但不生成任何需求文档，适合在项目初期提前部署悬浮球。
 
@@ -276,15 +276,7 @@ export const allSpecs = `
 import { allSpecs } from '@/live-spec.all'
 ```
 
-并将 `allSpecs` 传入组件：
-
-```tsx
-<LiveSpec content={spec} pageName={pageName} allSpecs={allSpecs} />
-```
-
-> **注意**：若 `LiveSpec.tsx` 尚不接受 `allSpecs` prop，
-> 则在组件 interface 中补充 `allSpecs?: string`，
-> 并将「复制全部」按钮的复制内容从 `getAllSpecs()` 改为直接使用 `allSpecs ?? content`。
+`allSpecs` 由 `LiveSpec.tsx` 内部直接 import，**不需要**经由 page.tsx 作为 prop 传入。
 
 ---
 
@@ -298,7 +290,6 @@ import { allSpecs } from '@/live-spec.all'
 import LiveSpec from '@/components/LiveSpec'
 import { spec, pageName } from './live-spec'
 import { history } from './live-spec.history'   // live-spec.history.ts 存在时必须引入
-import { allSpecs } from '@/live-spec.all'       // live-spec.all.ts 存在时必须引入
 ```
 
 JSX 中的挂载（根元素末尾）：
@@ -308,15 +299,14 @@ JSX 中的挂载（根元素末尾）：
   content={spec}
   pageName={pageName}
   history={history}       // live-spec.history.ts 存在时必须传入
-  allSpecs={allSpecs}     // live-spec.all.ts 存在时必须传入
 />
 ```
 
 **逐项检查规则**：
 - `live-spec.history.ts` 不存在 → 省略 `history` import 和 prop，待 `/live-spec tag` 后补充
-- `live-spec.all.ts` 不存在 → 省略 `allSpecs` import 和 prop，待 `/live-spec all` 后补充
-- 文件已存在但 import 缺失 → 必须补全，不得跳过
-- `<LiveSpec>` 已存在但 prop 不完整 → 必须补全所有可用 prop
+- `allSpecs` 由 `LiveSpec.tsx` 内部统一 import，page.tsx 中**不需要**引入或传递
+- 文件已存在但 `history` import 缺失 → 必须补全，不得跳过
+- `<LiveSpec>` 已存在但缺少 `history` prop → 必须补全
 
 ---
 
@@ -486,6 +476,17 @@ export const history: SpecVersion[] = [
 
 **追加规则**：新版本始终 push 到数组末尾，不修改已有条目。
 
+#### Step T4-B：同步 page.tsx 的 history import
+
+history 文件写入/更新后，检查对应页面的 `page.tsx`：
+- 若尚未 import `history` → 在 `live-spec` import 行下方追加：
+  ```tsx
+  import { history } from './live-spec.history'
+  ```
+- 若 `<LiveSpec>` 挂载处缺少 `history={history}` prop → 补全
+
+同一批次打 tag 涉及多个页面时，逐一检查并更新所有相关 page.tsx。
+
 #### Step T5：输出打 tag 结果摘要
 
 ```
@@ -502,7 +503,7 @@ export const history: SpecVersion[] = [
 
 ## 注意事项
 
-- `LiveSpec` 组件内部已做 `NODE_ENV !== 'development'` 判断，生产构建自动不渲染
 - `live-spec.ts` 是纯数据文件，不含任何 UI 逻辑，tree-shaking 对生产包无影响
+- `allSpecs` 由 `LiveSpec.tsx` 内部直接 import `@/live-spec.all`，各 page.tsx 无需重复引入
 - 不修改 `LiveSpec.tsx` 的显示逻辑，样式调整由用户自行决定
 - 若项目使用 `src/` 目录结构，组件路径为 `src/components/LiveSpec.tsx`，import 路径保持 `@/components/LiveSpec`
