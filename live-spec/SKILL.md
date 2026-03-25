@@ -292,20 +292,31 @@ import { allSpecs } from '@/live-spec.all'
 
 检查目标 `page.tsx` 是否已引入 `<LiveSpec>`：
 
-**若未引入**，在文件顶部添加 import，并在 JSX 根元素内末尾插入组件：
+**检查并确保以下内容全部存在于 `page.tsx` 中**，缺什么补什么：
 
 ```tsx
 import LiveSpec from '@/components/LiveSpec'
 import { spec, pageName } from './live-spec'
-import { history } from './live-spec.history'
-
-// 在 return 的根元素末尾添加：
-<LiveSpec content={spec} pageName={pageName} history={history} />
+import { history } from './live-spec.history'   // live-spec.history.ts 存在时必须引入
+import { allSpecs } from '@/live-spec.all'       // live-spec.all.ts 存在时必须引入
 ```
 
-**若已引入**，确认 import 路径包含 `live-spec.history`，无需重复添加。
-若 `live-spec.history.ts` 尚不存在（首次挂载），则 `history` import 暂时省略，
-待首次 `/live-spec tag` 后自动生成再补充。
+JSX 中的挂载（根元素末尾）：
+
+```tsx
+<LiveSpec
+  content={spec}
+  pageName={pageName}
+  history={history}       // live-spec.history.ts 存在时必须传入
+  allSpecs={allSpecs}     // live-spec.all.ts 存在时必须传入
+/>
+```
+
+**逐项检查规则**：
+- `live-spec.history.ts` 不存在 → 省略 `history` import 和 prop，待 `/live-spec tag` 后补充
+- `live-spec.all.ts` 不存在 → 省略 `allSpecs` import 和 prop，待 `/live-spec all` 后补充
+- 文件已存在但 import 缺失 → 必须补全，不得跳过
+- `<LiveSpec>` 已存在但 prop 不完整 → 必须补全所有可用 prop
 
 ---
 
